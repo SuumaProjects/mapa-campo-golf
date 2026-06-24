@@ -55,7 +55,7 @@
   <div class="shell">
     <div class="header">
       <h1 class="title">Mapa del campo</h1>
-      <div class="subtitle">Toca un punto o usa tu ubicación para orientarte.</div>
+      <div class="subtitle">Toca un punto o usa la ubicación capturada por Glide para orientarte.</div>
     </div>
     <div id="map"></div>
   </div>
@@ -65,7 +65,7 @@
       <div>
         <div class="nearest-label">Referencia del campo</div>
         <div class="nearest-title" id="nearestTitle">Ganguren · puntos del recorrido</div>
-        <div class="nearest-desc" id="nearestDesc">Activa “Centrarme” para ver el punto más cercano a tu ubicación.</div>
+        <div class="nearest-desc" id="nearestDesc">Actualiza tu ubicación en Glide para ver el punto más cercano.</div>
       </div>
       <div class="actions">
         <button class="primary" id="navBtn" disabled>Abrir navegación</button>
@@ -367,26 +367,66 @@ function updateUser(lat, lng) {
   map.setView([lat, lng], 17);
 }
 
+function parseUserLocationFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const loc = params.get('loc') || params.get('location') || params.get('coords');
+  const latParam = params.get('lat');
+  const lngParam = params.get('lng') || params.get('lon');
+
+  if (loc) {
+    const clean = decodeURIComponent(loc).trim();
+    const parts = clean.split(',').map(v => parseFloat(v.trim()));
+    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+      return { lat: parts[0], lng: parts[1] };
+    }
+  }
+
+  const lat = parseFloat(latParam);
+  const lng = parseFloat(lngParam);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  return null;
+}
+
+function centerOnKnownUserLocation() {
+  if (userLatLng) {
+    const nearest = nearestTo(userLatLng);
+    nearestPoint = nearest.point;
+    setPanel(nearest.point, nearest.distance);
+    map.setView([userLatLng.lat, userLatLng.lng], 17);
+    return true;
+  }
+  return false;
+}
+
 document.getElementById('navBtn').addEventListener('click', () => {
   if (!selectedPoint) return;
   window.open(navUrl(selectedPoint.lat, selectedPoint.lng), '_blank', 'noopener');
 });
 
 document.getElementById('locateBtn').addEventListener('click', () => {
+  if (centerOnKnownUserLocation()) return;
+
   if (!navigator.geolocation) {
-    document.getElementById('nearestDesc').textContent = 'Este dispositivo no permite geolocalización.';
+    document.getElementById('nearestTitle').textContent = 'Ubicación no disponible';
+    document.getElementById('nearestDesc').textContent = 'El mapa está dentro de Glide. Pasa la ubicación desde Glide o abre el mapa fuera de la app.';
     return;
   }
+
   document.getElementById('nearestDesc').textContent = 'Buscando tu ubicación…';
   navigator.geolocation.getCurrentPosition(
     pos => updateUser(pos.coords.latitude, pos.coords.longitude),
     err => {
       document.getElementById('nearestTitle').textContent = 'No se pudo obtener la ubicación';
-      document.getElementById('nearestDesc').textContent = 'Revisa los permisos de ubicación del navegador o de la app.';
+      document.getElementById('nearestDesc').textContent = 'Dentro de Glide puede estar bloqueada por el iframe. Usa la ubicación capturada por Glide o abre el mapa fuera.';
     },
     { enableHighAccuracy: true, timeout: 9000, maximumAge: 15000 }
   );
 });
+
+const initialUserLocation = parseUserLocationFromUrl();
+if (initialUserLocation) {
+  updateUser(initialUserLocation.lat, initialUserLocation.lng);
+}
 
 document.getElementById('fitBtn').addEventListener('click', () => {
   if (userMarker) {
