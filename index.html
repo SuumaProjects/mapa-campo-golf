@@ -24,14 +24,15 @@
     .title { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
     .subtitle { color: var(--muted); font-size: 13px; margin-top: 3px; }
     #map { width: 100%; height: 100%; min-height: 440px; }
-    .panel {  position: fixed;left: 10px;right: 10px;bottom: 88px;z-index: 999;background: var(--card);border: 1px solid var(--line);border-radius: 18px;box-shadow: var(--shadow);overflow: hidden;backdrop-filter: blur(10px); }
+    .panel { position: fixed; left: 10px; right: 10px; bottom: 88px; z-index: 999; background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; backdrop-filter: blur(10px); }
     .panel-inner { padding: 10px 14px; display: grid; gap: 6px; }
     .nearest-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
     .nearest-title { font-size: 18px; font-weight: 800; line-height: 1.1; }
     .nearest-desc { font-size: 13px; color: var(--muted); line-height: 1.3; }
-    .actions { display: flex; gap: 8px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     button { border: 0; border-radius: 12px; padding: 10px 12px; font-weight: 800; font-size: 13px; cursor: pointer; }
-    .primary { background: #111827; color: white; flex: 1; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .primary { background: #111827; color: white; grid-column: 1 / -1; }
     .secondary { background: rgba(17,24,39,.08); color: #111827; }
     .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 9px; }
     .legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -67,7 +68,8 @@
         <div class="nearest-desc" id="nearestDesc">Activa “Centrarme” para ver el punto más cercano a tu ubicación.</div>
       </div>
       <div class="actions">
-        <button class="primary" id="locateBtn">Centrarme</button>
+        <button class="primary" id="navBtn" disabled>Abrir navegación</button>
+        <button class="secondary" id="locateBtn">Centrarme</button>
         <button class="secondary" id="fitBtn">Ver campo</button>
       </div>
       <div class="legend">
@@ -281,6 +283,7 @@ const markers = [];
 let userMarker = null;
 let userLatLng = null;
 let nearestPoint = null;
+let selectedPoint = null;
 
 function markerClass(type) {
   return type === 'WC' ? 'wc' : 'tee';
@@ -311,8 +314,10 @@ function escapeHtml(value) {
 
 POINTS.forEach(point => {
   const m = L.marker([point.lat, point.lng], { icon: divIcon(point) }).addTo(map);
-  m.bindPopup(popupHtml(point));
-  m.on('click', () => setPanel(point));
+  m.on('click', () => {
+    setPanel(point);
+    map.panTo([point.lat, point.lng], { animate: true });
+  });
   markers.push(m);
 });
 
@@ -320,6 +325,8 @@ const group = L.featureGroup(markers);
 map.fitBounds(group.getBounds().pad(0.18));
 
 function setPanel(point, distanceMeters=null) {
+  selectedPoint = point;
+  document.getElementById('navBtn').disabled = false;
   document.getElementById('nearestTitle').textContent = point.title;
   const distText = distanceMeters == null ? '' : ` · ${formatDistance(distanceMeters)} aprox.`;
   document.getElementById('nearestDesc').textContent = `${point.description}${distText}`;
@@ -352,13 +359,18 @@ function updateUser(lat, lng) {
   if (userMarker) userMarker.setLatLng([lat, lng]);
   else {
     const icon = L.divIcon({ className: '', html: '<div class="pin user"></div>', iconSize: [26,26], iconAnchor: [13,13] });
-    userMarker = L.marker([lat, lng], { icon }).addTo(map).bindPopup('<div class="popup-title">Tu ubicación</div><div class="popup-desc">Posición aproximada del dispositivo.</div>');
+    userMarker = L.marker([lat, lng], { icon }).addTo(map);
   }
   const nearest = nearestTo(userLatLng);
   nearestPoint = nearest.point;
   setPanel(nearest.point, nearest.distance);
   map.setView([lat, lng], 17);
 }
+
+document.getElementById('navBtn').addEventListener('click', () => {
+  if (!selectedPoint) return;
+  window.open(navUrl(selectedPoint.lat, selectedPoint.lng), '_blank', 'noopener');
+});
 
 document.getElementById('locateBtn').addEventListener('click', () => {
   if (!navigator.geolocation) {
