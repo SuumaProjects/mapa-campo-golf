@@ -284,6 +284,7 @@ let userMarker = null;
 let userLatLng = null;
 let nearestPoint = null;
 let selectedPoint = null;
+const OFF_COURSE_DISTANCE_METERS = 1500;
 
 function markerClass(type) {
   return type === 'WC' ? 'wc' : 'tee';
@@ -327,9 +328,25 @@ map.fitBounds(group.getBounds().pad(0.18));
 function setPanel(point, distanceMeters=null) {
   selectedPoint = point;
   document.getElementById('navBtn').disabled = false;
-  document.getElementById('nearestTitle').textContent = point.title;
+
+  const navBtn = document.getElementById('navBtn');
+  const labelEl = document.querySelector('.nearest-label');
+  const titleEl = document.getElementById('nearestTitle');
+  const descEl = document.getElementById('nearestDesc');
+
+  if (distanceMeters != null && distanceMeters > OFF_COURSE_DISTANCE_METERS) {
+    labelEl.textContent = 'Fuera del campo';
+    titleEl.textContent = 'Estás fuera del campo';
+    descEl.textContent = `Punto más cercano: ${point.title} · ${formatDistance(distanceMeters)} aprox.`;
+    navBtn.textContent = 'Navegar al campo';
+    return;
+  }
+
+  labelEl.textContent = 'Referencia del campo';
+  titleEl.textContent = point.title;
   const distText = distanceMeters == null ? '' : ` · ${formatDistance(distanceMeters)} aprox.`;
-  document.getElementById('nearestDesc').textContent = `${point.description}${distText}`;
+  descEl.textContent = `${point.description}${distText}`;
+  navBtn.textContent = 'Abrir navegación';
 }
 function formatDistance(m) {
   if (m < 1000) return `${Math.round(m)} m`;
@@ -354,7 +371,7 @@ function nearestTo(latlng, typeFilter=null) {
   }
   return best;
 }
-function updateUser(lat, lng) {
+function updateUser(lat, lng, focus=false) {
   userLatLng = { lat, lng };
   if (userMarker) userMarker.setLatLng([lat, lng]);
   else {
@@ -364,7 +381,7 @@ function updateUser(lat, lng) {
   const nearest = nearestTo(userLatLng);
   nearestPoint = nearest.point;
   setPanel(nearest.point, nearest.distance);
-  map.setView([lat, lng], 17);
+  if (focus) map.setView([lat, lng], 17);
 }
 
 function parseUserLocationFromUrl() {
@@ -374,7 +391,7 @@ function parseUserLocationFromUrl() {
   const lngParam = params.get('lng') || params.get('lon');
 
   if (loc) {
-    const clean = decodeURIComponent(loc).trim();
+    const clean = decodeURIComponent(loc).trim().replace(/[{}()\[\]]/g, '');
     const parts = clean.split(',').map(v => parseFloat(v.trim()));
     if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
       return { lat: parts[0], lng: parts[1] };
@@ -414,7 +431,7 @@ document.getElementById('locateBtn').addEventListener('click', () => {
 
   document.getElementById('nearestDesc').textContent = 'Buscando tu ubicación…';
   navigator.geolocation.getCurrentPosition(
-    pos => updateUser(pos.coords.latitude, pos.coords.longitude),
+    pos => updateUser(pos.coords.latitude, pos.coords.longitude, true),
     err => {
       document.getElementById('nearestTitle').textContent = 'No se pudo obtener la ubicación';
       document.getElementById('nearestDesc').textContent = 'Dentro de Glide puede estar bloqueada por el iframe. Usa la ubicación capturada por Glide o abre el mapa fuera.';
@@ -425,16 +442,11 @@ document.getElementById('locateBtn').addEventListener('click', () => {
 
 const initialUserLocation = parseUserLocationFromUrl();
 if (initialUserLocation) {
-  updateUser(initialUserLocation.lat, initialUserLocation.lng);
+  updateUser(initialUserLocation.lat, initialUserLocation.lng, false);
 }
 
 document.getElementById('fitBtn').addEventListener('click', () => {
-  if (userMarker) {
-    const all = L.featureGroup([...markers, userMarker]);
-    map.fitBounds(all.getBounds().pad(0.18));
-  } else {
-    map.fitBounds(group.getBounds().pad(0.18));
-  }
+  map.fitBounds(group.getBounds().pad(0.18));
 });
 </script>
 </body>
