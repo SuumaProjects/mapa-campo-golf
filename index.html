@@ -3,82 +3,281 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Mapa del campo</title>
+  <title>Recorrido del campo</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <style>
     :root {
-      --bg: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
+      --ink: #111827;
+      --muted: #667085;
+      --card: rgba(255,255,255,.92);
+      --card-solid: #ffffff;
       --line: rgba(17,24,39,.12);
-      --card: rgba(255,255,255,.94);
-      --shadow: 0 8px 28px rgba(0,0,0,.18);
-      --tee: #135f4a;
+      --shadow: 0 14px 40px rgba(0,0,0,.24);
+      --green: #0f5f46;
+      --green-2: #15a36a;
+      --sand: #f3ead7;
       --wc: #1f2937;
-      --user: #2563eb;
+      --route: #f7c948;
+      --route-dark: #8a5a00;
     }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
-    .shell { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
-    .header { padding: 12px 14px 8px; }
-    .title { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
-    .subtitle { color: var(--muted); font-size: 13px; margin-top: 3px; }
-    #map { width: 100%; height: 100%; min-height: 440px; }
-    .panel { position: fixed; left: 10px; right: 10px; bottom: 88px; z-index: 999; background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; backdrop-filter: blur(10px); }
-    .panel-inner { padding: 10px 14px; display: grid; gap: 6px; }
-    .nearest-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
-    .nearest-title { font-size: 18px; font-weight: 800; line-height: 1.1; }
-    .nearest-desc { font-size: 13px; color: var(--muted); line-height: 1.3; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    button { border: 0; border-radius: 12px; padding: 10px 12px; font-weight: 800; font-size: 13px; cursor: pointer; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #f6f4ef;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      min-height: 520px;
+      background: #d7d3c8;
+    }
+
+    .top-card {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,255,255,.84));
+      border: 1px solid rgba(255,255,255,.75);
+      box-shadow: 0 10px 32px rgba(0,0,0,.20);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+      padding: 12px 14px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--green);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .10em;
+      font-weight: 900;
+      margin-bottom: 3px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--route);
+      box-shadow: 0 0 0 4px rgba(247,201,72,.22);
+    }
+
+    .top-title {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.05;
+      font-weight: 900;
+      letter-spacing: -.035em;
+    }
+
+    .top-subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .panel {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: 88px;
+      z-index: 1000;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.78);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+
+    .panel-inner {
+      padding: 11px 14px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .panel-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .nearest-label {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .10em;
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .nearest-title {
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-top: 2px;
+    }
+
+    .nearest-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.32;
+      margin-top: 3px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 48px;
+      height: 34px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(15,95,70,.10);
+      color: var(--green);
+      font-weight: 900;
+      font-size: 12px;
+      border: 1px solid rgba(15,95,70,.16);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: -.01em;
+    }
+
     button:disabled { opacity: .45; cursor: not-allowed; }
-    .primary { background: #111827; color: white; grid-column: 1 / -1; }
-    .secondary { background: rgba(17,24,39,.08); color: #111827; }
-    .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 9px; }
+    .primary { background: var(--ink); color: white; }
+    .secondary { background: rgba(17,24,39,.08); color: var(--ink); }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 9px;
+    }
+
     .legend span { display: inline-flex; align-items: center; gap: 5px; }
     .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
-    .dot.tee { background: var(--tee); }
+    .dot.route { background: var(--route); }
+    .dot.tee { background: var(--green); }
     .dot.wc { background: var(--wc); }
-    .dot.user { background: var(--user); }
-    .pin { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: white; font-size: 10px; font-weight: 900; box-shadow: 0 2px 10px rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.9); }
-    .pin.tee { background: var(--tee); }
-    .pin.wc { background: var(--wc); font-size: 9px; }
-    .pin.user { background: var(--user); width: 18px; height: 18px; border: 4px solid rgba(255,255,255,.95); box-shadow: 0 0 0 6px rgba(37,99,235,.22), 0 3px 12px rgba(0,0,0,.35); }
-    .leaflet-popup-content-wrapper { border-radius: 14px; }
-    .popup-title { font-weight: 900; font-size: 14px; }
-    .popup-desc { margin-top: 3px; color: #4b5563; font-size: 12px; }
-    .popup-nav { display: inline-block; margin-top: 8px; color: #111827; font-weight: 800; text-decoration: none; font-size: 12px; }
-    @media (max-height: 620px) { #map { min-height: 360px; } .nearest-desc { display:none; } }
+
+    .pin {
+      width: 31px;
+      height: 31px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: -.04em;
+      border: 2px solid rgba(255,255,255,.96);
+      box-shadow: 0 5px 16px rgba(0,0,0,.32);
+      transform: translateZ(0);
+    }
+
+    .pin.tee {
+      background: radial-gradient(circle at 35% 28%, #2ed38e, var(--green) 66%);
+    }
+
+    .pin.wc {
+      background: radial-gradient(circle at 35% 28%, #475467, #111827 70%);
+      font-size: 9px;
+    }
+
+    .pin.start, .pin.finish {
+      width: 38px;
+      height: 38px;
+      font-size: 10px;
+      background: radial-gradient(circle at 35% 28%, #ffd968, var(--route-dark) 72%);
+      color: #fff;
+      border: 3px solid white;
+    }
+
+    .leaflet-control-zoom {
+      margin-top: 92px !important;
+      border: 0 !important;
+      box-shadow: 0 6px 18px rgba(0,0,0,.22) !important;
+    }
+    .leaflet-control-zoom a {
+      background: rgba(255,255,255,.93) !important;
+      color: var(--ink) !important;
+      border: 0 !important;
+      font-weight: 900;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 9px;
+      background: rgba(255,255,255,.64) !important;
+    }
+
+    @media (max-height: 650px) {
+      .top-card { padding: 10px 12px; }
+      .top-title { font-size: 18px; }
+      .top-subtitle { display: none; }
+      .nearest-desc { display: none; }
+      .panel { bottom: 76px; }
+    }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <div class="header">
-      <h1 class="title">Mapa del campo</h1>
-      <div class="subtitle">Toca un punto para orientarte.</div>
-    </div>
-    <div id="map"></div>
-  </div>
+  <div id="map"></div>
 
-  <div class="panel">
+  <section class="top-card" aria-label="Título del mapa">
+    <div class="eyebrow">Recorrido explicativo</div>
+    <h1 class="top-title">Mapa del campo</h1>
+    <div class="top-subtitle">Vista general del recorrido, salidas y servicios principales.</div>
+  </section>
+
+  <section class="panel" aria-label="Información del punto seleccionado">
     <div class="panel-inner">
-      <div>
-        <div class="nearest-label">Referencia del campo</div>
-        <div class="nearest-title" id="nearestTitle">Ganguren · puntos del recorrido</div>
-        <div class="nearest-desc" id="nearestDesc">Actualiza tu ubicación en Glide para ver el punto más cercano.</div>
+      <div class="panel-row">
+        <div>
+          <div class="nearest-label" id="panelLabel">Vista general</div>
+          <div class="nearest-title" id="nearestTitle">Recorrido completo</div>
+          <div class="nearest-desc" id="nearestDesc">Toca un hoyo o servicio para ver la referencia y abrir navegación.</div>
+        </div>
+        <div class="badge" id="panelBadge">18H</div>
       </div>
       <div class="actions">
         <button class="primary" id="navBtn" disabled>Abrir navegación</button>
-        <button class="secondary" id="locateBtn">Centrarme</button>
-        <button class="secondary" id="fitBtn">Ver campo</button>
+        <button class="secondary" id="fitBtn">Ver recorrido</button>
       </div>
       <div class="legend">
-        <span><i class="dot tee"></i> Salidas</span>
+        <span><i class="dot route"></i> Recorrido</span>
+        <span><i class="dot tee"></i> Hoyos</span>
         <span><i class="dot wc"></i> Servicios</span>
-        <span><i class="dot user"></i> Tú</span>
       </div>
     </div>
-  </div>
+  </section>
 
 <script>
 const POINTS = [
@@ -267,54 +466,77 @@ const POINTS = [
 const map = L.map('map', { zoomControl: false, attributionControl: true });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// Capa satélite. Para producción recomendamos Mapbox/MapTiler con una clave propia.
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 20,
   attribution: 'Tiles © Esri'
 }).addTo(map);
 
-// Etiquetas encima del satélite.
 L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 20,
   attribution: ''
 }).addTo(map);
 
-const markers = [];
-let userMarker = null;
-let userLatLng = null;
-let nearestPoint = null;
+const HOLES = POINTS.filter(p => p.type === 'TEE').sort((a,b) => a.hole - b.hole);
+const routeCoords = HOLES.map(p => [p.lat, p.lng]);
 let selectedPoint = null;
-const OFF_COURSE_DISTANCE_METERS = 1500;
 
-function markerClass(type) {
-  return type === 'WC' ? 'wc' : 'tee';
+// Trazado simple del recorrido: une las salidas H1-H18 en orden.
+// En una fase posterior se puede sustituir por un GeoJSON/GPX con el camino real.
+const routeHalo = L.polyline(routeCoords, { color: '#ffffff', weight: 9, opacity: .78, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+const routeLine = L.polyline(routeCoords, { color: '#f7c948', weight: 5, opacity: .95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+
+const markers = [];
+
+function markerClass(point) {
+  if (point.type === 'WC') return 'wc';
+  if (point.hole === 1) return 'start';
+  if (point.hole === 18) return 'finish';
+  return 'tee';
 }
+
 function markerLabel(point) {
-  return point.type === 'WC' ? 'WC' : point.label;
+  if (point.type === 'WC') return 'WC';
+  if (point.hole === 1) return 'H1';
+  if (point.hole === 18) return 'H18';
+  return point.label;
 }
+
+function iconSize(point) {
+  return (point.hole === 1 || point.hole === 18) ? [38,38] : [31,31];
+}
+
+function divIcon(point) {
+  const size = iconSize(point);
+  return L.divIcon({
+    className: '',
+    html: `<div class="pin ${markerClass(point)}">${markerLabel(point)}</div>`,
+    iconSize: size,
+    iconAnchor: [size[0]/2, size[1]/2]
+  });
+}
+
 function navUrl(lat, lng) {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 }
-function divIcon(point) {
-  return L.divIcon({
-    className: '',
-    html: `<div class="pin ${markerClass(point.type)}">${markerLabel(point)}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -12]
-  });
+
+function cleanDescription(point) {
+  if (point.type === 'WC') return 'Servicio disponible en el recorrido.';
+  if (point.hole === 1) return 'Inicio del recorrido del campo.';
+  if (point.hole === 18) return 'Última salida del recorrido.';
+  return `Salida del hoyo ${point.hole} dentro del recorrido.`;
 }
-function popupHtml(point) {
-  return `<div class="popup-title">${escapeHtml(point.title)}</div>
-          <div class="popup-desc">${escapeHtml(point.description)}</div>
-          <a class="popup-nav" target="_blank" rel="noopener" href="${navUrl(point.lat, point.lng)}">Abrir navegación</a>`;
-}
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+
+function setPanel(point) {
+  selectedPoint = point;
+  document.getElementById('navBtn').disabled = false;
+  document.getElementById('panelLabel').textContent = point.type === 'WC' ? 'Servicio' : 'Referencia del recorrido';
+  document.getElementById('nearestTitle').textContent = point.title;
+  document.getElementById('nearestDesc').textContent = cleanDescription(point);
+  document.getElementById('panelBadge').textContent = point.type === 'WC' ? 'WC' : `H${point.hole}`;
 }
 
 POINTS.forEach(point => {
-  const m = L.marker([point.lat, point.lng], { icon: divIcon(point) }).addTo(map);
+  const m = L.marker([point.lat, point.lng], { icon: divIcon(point), keyboard: false }).addTo(map);
   m.on('click', () => {
     setPanel(point);
     map.panTo([point.lat, point.lng], { animate: true });
@@ -322,132 +544,19 @@ POINTS.forEach(point => {
   markers.push(m);
 });
 
-const group = L.featureGroup(markers);
-map.fitBounds(group.getBounds().pad(0.18));
-
-function setPanel(point, distanceMeters=null) {
-  selectedPoint = point;
-  document.getElementById('navBtn').disabled = false;
-
-  const navBtn = document.getElementById('navBtn');
-  const labelEl = document.querySelector('.nearest-label');
-  const titleEl = document.getElementById('nearestTitle');
-  const descEl = document.getElementById('nearestDesc');
-
-  if (distanceMeters != null && distanceMeters > OFF_COURSE_DISTANCE_METERS) {
-    labelEl.textContent = 'Fuera del campo';
-    titleEl.textContent = 'Estás fuera del campo';
-    descEl.textContent = `Punto más cercano: ${point.title} · ${formatDistance(distanceMeters)} aprox.`;
-    navBtn.textContent = 'Navegar al campo';
-    return;
-  }
-
-  labelEl.textContent = 'Referencia del campo';
-  titleEl.textContent = point.title;
-  const distText = distanceMeters == null ? '' : ` · ${formatDistance(distanceMeters)} aprox.`;
-  descEl.textContent = `${point.description}${distText}`;
-  navBtn.textContent = 'Abrir navegación';
+const group = L.featureGroup([...markers, routeHalo, routeLine]);
+function fitCourse() {
+  map.fitBounds(group.getBounds().pad(0.20));
 }
-function formatDistance(m) {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m/1000).toFixed(1).replace('.', ',')} km`;
-}
-function haversine(a, b) {
-  const R = 6371000;
-  const toRad = d => d * Math.PI / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
-}
-function nearestTo(latlng, typeFilter=null) {
-  const candidates = typeFilter ? POINTS.filter(p => p.type === typeFilter) : POINTS;
-  let best = null;
-  for (const p of candidates) {
-    const d = haversine({lat: latlng.lat, lng: latlng.lng}, {lat: p.lat, lng: p.lng});
-    if (!best || d < best.distance) best = { point: p, distance: d };
-  }
-  return best;
-}
-function updateUser(lat, lng, focus=false) {
-  userLatLng = { lat, lng };
-  if (userMarker) userMarker.setLatLng([lat, lng]);
-  else {
-    const icon = L.divIcon({ className: '', html: '<div class="pin user"></div>', iconSize: [26,26], iconAnchor: [13,13] });
-    userMarker = L.marker([lat, lng], { icon }).addTo(map);
-  }
-  const nearest = nearestTo(userLatLng);
-  nearestPoint = nearest.point;
-  setPanel(nearest.point, nearest.distance);
-  if (focus) map.setView([lat, lng], 17);
-}
+fitCourse();
 
-function parseUserLocationFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const loc = params.get('loc') || params.get('location') || params.get('coords');
-  const latParam = params.get('lat');
-  const lngParam = params.get('lng') || params.get('lon');
-
-  if (loc) {
-    const clean = decodeURIComponent(loc).trim().replace(/[{}()\[\]]/g, '');
-    const parts = clean.split(',').map(v => parseFloat(v.trim()));
-    if (parts.length >= 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
-      return { lat: parts[0], lng: parts[1] };
-    }
-  }
-
-  const lat = parseFloat(latParam);
-  const lng = parseFloat(lngParam);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-  return null;
-}
-
-function centerOnKnownUserLocation() {
-  if (userLatLng) {
-    const nearest = nearestTo(userLatLng);
-    nearestPoint = nearest.point;
-    setPanel(nearest.point, nearest.distance);
-    map.setView([userLatLng.lat, userLatLng.lng], 17);
-    return true;
-  }
-  return false;
-}
-
+// Panel inicial.
 document.getElementById('navBtn').addEventListener('click', () => {
   if (!selectedPoint) return;
   window.open(navUrl(selectedPoint.lat, selectedPoint.lng), '_blank', 'noopener');
 });
 
-document.getElementById('locateBtn').addEventListener('click', () => {
-  if (centerOnKnownUserLocation()) return;
-
-  if (!navigator.geolocation) {
-    document.getElementById('nearestTitle').textContent = 'Ubicación no disponible';
-    document.getElementById('nearestDesc').textContent = 'El mapa está dentro de Glide. Pasa la ubicación desde Glide o abre el mapa fuera de la app.';
-    return;
-  }
-
-  document.getElementById('nearestDesc').textContent = 'Buscando tu ubicación…';
-  navigator.geolocation.getCurrentPosition(
-    pos => updateUser(pos.coords.latitude, pos.coords.longitude, true),
-    err => {
-      document.getElementById('nearestTitle').textContent = 'No se pudo obtener la ubicación';
-      document.getElementById('nearestDesc').textContent = 'Dentro de Glide puede estar bloqueada por el iframe. Usa la ubicación capturada por Glide o abre el mapa fuera.';
-    },
-    { enableHighAccuracy: true, timeout: 9000, maximumAge: 15000 }
-  );
-});
-
-const initialUserLocation = parseUserLocationFromUrl();
-if (initialUserLocation) {
-  updateUser(initialUserLocation.lat, initialUserLocation.lng, false);
-}
-
-document.getElementById('fitBtn').addEventListener('click', () => {
-  map.fitBounds(group.getBounds().pad(0.18));
-});
+document.getElementById('fitBtn').addEventListener('click', fitCourse);
 </script>
 </body>
 </html>
